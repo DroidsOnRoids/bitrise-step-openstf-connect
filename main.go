@@ -28,7 +28,7 @@ const devicesEndpoint = "/api/v1/devices"
 const userDevicesEndpoint = "/api/v1/user/devices"
 
 var stfHostUrl = os.Getenv("stf_host_url")
-var stfToken = os.Getenv("stf_token")
+var stfApiToken = os.Getenv("stf_api_token")
 var deviceQuery = os.Getenv("device_query")
 var deviceNumberLimit int
 var adbKeyPub = os.Getenv("adb_key_pub")
@@ -93,7 +93,7 @@ func connectToAdb(remoteConnectUrl string) {
 
 func getRemoteConnectUrl(serial string) string {
 	req, _ := http.NewRequest("POST", stfHostUrl + userDevicesEndpoint + "/" + serial + "/remoteConnect", nil)
-	req.Header.Set("Authorization", "Bearer " + stfToken)
+	req.Header.Set("Authorization", "Bearer " + stfApiToken)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
@@ -119,7 +119,7 @@ func addDevice(serial string) {
 	device := &Device{Serial: serial}
 	body, _ := json.Marshal(device)
 	req, _ := http.NewRequest("POST", stfHostUrl + userDevicesEndpoint, bytes.NewBuffer(body))
-	req.Header.Set("Authorization", "Bearer " + stfToken)
+	req.Header.Set("Authorization", "Bearer " + stfApiToken)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
@@ -133,7 +133,7 @@ func addDevice(serial string) {
 
 func getSerials() []string {
 	req, _ := http.NewRequest("GET", stfHostUrl + devicesEndpoint, nil)
-	req.Header.Set("Authorization", "Bearer " + stfToken)
+	req.Header.Set("Authorization", "Bearer " + stfApiToken)
 
 	resp, err := client.Do(req)
 	if err != nil {
