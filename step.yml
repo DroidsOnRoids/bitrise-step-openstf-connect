@@ -24,9 +24,6 @@ project_type_tags:
   - cordova
   - ionic
 
-# Type tags are used for categorizing steps, for easier step discovery in Step Libraries.
-# You can find more information about type tags in the Step Development Guideline:
-# https://github.com/bitrise-io/bitrise/blob/master/_docs/step-development-guideline.md
 type_tags:
   - test
 
@@ -45,22 +42,21 @@ toolkit:
   go:
     package_name: github.com/DroidsOnRoids/bitrise-step-openstf-connect
 
-
 inputs:
   - stf_host_url:
     opts:
-      title: Host URL
-      summary: Summary. No more than 2-3 sentences.
+      title: STF Host URL
+      summary: OpenSTF host URL, required.
       description: |
-        Description of this input.
+        URL of your STF instance e.g. `https://stf.example.com`
       is_required: true
 
-  - stf_api_token:
+  - stf_access_token:
     opts:
-      title: API token
-      summary: Summary. No more than 2-3 sentences.
+      title: STF API access token
+      summary: STF API access token, required. Go to `Settings->Keys` on your STF web UI to generate one.
       description: |
-        Description of this input.
+        Read more about tokens in [OpenSTF API documentation](https://github.com/openstf/stf/blob/master/doc/API.md#authentication).
       is_required: true
 
   - device_query: "."

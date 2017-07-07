@@ -18,7 +18,7 @@ import (
 
 type ConfigsModel struct {
 	stfHostUrl        string
-	stfApiToken       string
+	stfAccessToken    string
 	deviceQuery       string
 	deviceNumberLimit int
 	adbKeyPub         string
@@ -41,7 +41,7 @@ var client = &http.Client{Timeout: time.Second * 10}
 func createConfigsModelFromEnvs() ConfigsModel {
 	return ConfigsModel{
 		stfHostUrl:        os.Getenv("stf_host_url"),
-		stfApiToken:       os.Getenv("stf_api_token"),
+		stfAccessToken:    os.Getenv("stf_access_token"),
 		deviceQuery:       os.Getenv("device_query"),
 		deviceNumberLimit: getDeviceNumberLimitFromEnv(),
 		adbKeyPub:         os.Getenv("adb_key_pub"),
@@ -72,14 +72,17 @@ func (configs ConfigsModel) validate() {
 	if !strings.HasPrefix(configs.stfHostUrl, "http") {
 		log.Fatalf("Invalid STF host: %s", configs.stfHostUrl)
 	}
-	if configs.stfApiToken == "" {
-		log.Fatal("STF token cannot be empty")
+	if configs.stfAccessToken == "" {
+		log.Fatal("STF access token cannot be empty")
 	}
 	if configs.adbKey == "" {
 		log.Fatal("Private ADB key cannot be empty")
 	}
 	if configs.adbKeyPub == "" {
 		log.Fatal("Public ADB key cannot be empty")
+	}
+	if configs.deviceQuery == "" {
+		configs.deviceQuery = "."
 	}
 }
 
@@ -137,7 +140,7 @@ func connectToAdb(remoteConnectUrl string) {
 
 func getRemoteConnectUrl(configs ConfigsModel, serial string) string {
 	req, _ := http.NewRequest("POST", configs.stfHostUrl + userDevicesEndpoint + "/" + serial + "/remoteConnect", nil)
-	req.Header.Set("Authorization", "Bearer " + configs.stfApiToken)
+	req.Header.Set("Authorization", "Bearer " + configs.stfAccessToken)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
@@ -163,7 +166,7 @@ func addDevice(configs ConfigsModel, serial string) {
 	device := &Device{Serial: serial}
 	body, _ := json.Marshal(device)
 	req, _ := http.NewRequest("POST", configs.stfHostUrl + userDevicesEndpoint, bytes.NewBuffer(body))
-	req.Header.Set("Authorization", "Bearer " + configs.stfApiToken)
+	req.Header.Set("Authorization", "Bearer " + configs.stfAccessToken)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
@@ -177,7 +180,7 @@ func addDevice(configs ConfigsModel, serial string) {
 
 func getSerials(configs ConfigsModel) []string {
 	req, _ := http.NewRequest("GET", configs.stfHostUrl + devicesEndpoint, nil)
-	req.Header.Set("Authorization", "Bearer " + configs.stfApiToken)
+	req.Header.Set("Authorization", "Bearer " + configs.stfAccessToken)
 
 	resp, err := client.Do(req)
 	if err != nil {
