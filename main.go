@@ -26,12 +26,12 @@ type RemoteConnection struct {
 const devicesEndpoint = "/api/v1/devices"
 const userDevicesEndpoint = "/api/v1/user/devices"
 
-const stfHostUrl = os.Getenv("stf_host_url")
-const stfToken = os.Getenv("stf_token")
-const deviceQuery = os.Getenv("device_query")
-const deviceNumberLimit = os.Getenv("device_number_limit")
-const adbKeyPub = os.Getenv("adb_key_pub")
-const adbKey = os.Getenv("adb_key")
+var stfHostUrl = os.Getenv("stf_host_url")
+var stfToken = os.Getenv("stf_token")
+var deviceQuery = os.Getenv("device_query")
+var deviceNumberLimit = os.Getenv("device_number_limit")
+var adbKeyPub = os.Getenv("adb_key_pub")
+var adbKey = os.Getenv("adb_key")
 
 var client = &http.Client{Timeout: time.Second * 10}
 
