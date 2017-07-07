@@ -93,7 +93,7 @@ func main() {
 
 	serials := getSerials(configs)
 	setAdbKeys(configs)
-	exportArrayWithEnvman("STF_DEVICE_SERIALS", serials)
+	exportArrayWithEnvman("STF_DEVICE_SERIAL_LIST", serials)
 
 	for _, serial := range serials {
 		addDevice(configs, serial)
