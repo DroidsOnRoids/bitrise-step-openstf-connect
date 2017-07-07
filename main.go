@@ -1,20 +1,29 @@
 package main
 
 import (
-	"net/http"
-	"time"
-	"os/exec"
 	"bytes"
-	"log"
-	"strings"
-	"os"
 	"encoding/json"
 	"io/ioutil"
-	"path/filepath"
-	"os/user"
+	"log"
 	"math/rand"
+	"net/http"
+	"os"
+	"os/exec"
+	"os/user"
+	"path/filepath"
 	"strconv"
+	"strings"
+	"time"
 )
+
+type ConfigsModel struct {
+	stfHostUrl        string
+	stfApiToken       string
+	deviceQuery       string
+	deviceNumberLimit int
+	adbKeyPub         string
+	adbKey            string
+}
 
 type Device struct {
 	Serial string `json:"serial"`
@@ -27,45 +36,80 @@ type RemoteConnection struct {
 const devicesEndpoint = "/api/v1/devices"
 const userDevicesEndpoint = "/api/v1/user/devices"
 
-var stfHostUrl = os.Getenv("stf_host_url")
-var stfApiToken = os.Getenv("stf_api_token")
-var deviceQuery = os.Getenv("device_query")
-var deviceNumberLimit int
-var adbKeyPub = os.Getenv("adb_key_pub")
-var adbKey = os.Getenv("adb_key")
-
 var client = &http.Client{Timeout: time.Second * 10}
 
-func main() {
+func createConfigsModelFromEnvs() ConfigsModel {
+	return ConfigsModel{
+		stfHostUrl:        os.Getenv("stf_host_url"),
+		stfApiToken:       os.Getenv("stf_api_token"),
+		deviceQuery:       os.Getenv("device_query"),
+		deviceNumberLimit: getDeviceNumberLimitFromEnv(),
+		adbKeyPub:         os.Getenv("adb_key_pub"),
+		adbKey:            os.Getenv("adb_key"),
+	}
+}
+
+func getDeviceNumberLimitFromEnv() int {
 	envDeviceNumberLimit := os.Getenv("device_number_limit")
+	if envDeviceNumberLimit == "" {
+		return 0
+	}
 	i, err := strconv.Atoi(envDeviceNumberLimit)
 	if err != nil {
-		log.Fatalf("Invalid device number limit: %s %s", envDeviceNumberLimit, err)
+		log.Fatalf("Device number limit: %s is not a number nor empty string", envDeviceNumberLimit)
 	}
-	deviceNumberLimit = i
+	return i
+}
 
-	serials := getSerials()
-	setAdbKeys()
+func (configs ConfigsModel) dump() {
+	log.Println("Configs:")
+	log.Printf("STF host           : %s", configs.stfHostUrl)
+	log.Printf("Device query       : %s", configs.deviceQuery)
+	log.Printf("Device number limit: %d", configs.deviceNumberLimit)
+}
+
+func (configs ConfigsModel) validate() {
+	if !strings.HasPrefix(configs.stfHostUrl, "http") {
+		log.Fatalf("Invalid STF host: %s", configs.stfHostUrl)
+	}
+	if configs.stfApiToken == "" {
+		log.Fatal("STF token cannot be empty")
+	}
+	if configs.adbKey == "" {
+		log.Fatal("Private ADB key cannot be empty")
+	}
+	if configs.adbKeyPub == "" {
+		log.Fatal("Public ADB key cannot be empty")
+	}
+}
+
+func main() {
+	configs := createConfigsModelFromEnvs()
+	configs.dump()
+	configs.validate()
+
+	serials := getSerials(configs)
+	setAdbKeys(configs)
 	exportArrayWithEnvman("STF_DEVICE_SERIALS", serials)
 
 	for _, serial := range serials {
-		addDevice(serial)
-		remoteConnectUrl := getRemoteConnectUrl(serial)
+		addDevice(configs, serial)
+		remoteConnectUrl := getRemoteConnectUrl(configs, serial)
 		connectToAdb(remoteConnectUrl)
 	}
 }
 
-func setAdbKeys() {
+func setAdbKeys(configs ConfigsModel) {
 	usr, err := user.Current()
 	if err != nil {
 		log.Fatalf("Could not determine current user %s", err)
 	}
 
 	adbKeyPath := filepath.Join(usr.HomeDir, ".android", "adbkey")
-	writeFile(adbKeyPath, adbKey, 0644)
+	writeFile(adbKeyPath, configs.adbKey, 0644)
 
 	adbKeyPubPath := filepath.Join(usr.HomeDir, ".android", "adbkey.pub")
-	writeFile(adbKeyPubPath, adbKeyPub, 0600)
+	writeFile(adbKeyPubPath, configs.adbKeyPub, 0600)
 
 	err = exec.Command(getAdbPath(), "kill-server").Run()
 	if err != nil {
@@ -91,9 +135,9 @@ func connectToAdb(remoteConnectUrl string) {
 	log.Println(string(output))
 }
 
-func getRemoteConnectUrl(serial string) string {
-	req, _ := http.NewRequest("POST", stfHostUrl + userDevicesEndpoint + "/" + serial + "/remoteConnect", nil)
-	req.Header.Set("Authorization", "Bearer " + stfApiToken)
+func getRemoteConnectUrl(configs ConfigsModel, serial string) string {
+	req, _ := http.NewRequest("POST", configs.stfHostUrl + userDevicesEndpoint + "/" + serial + "/remoteConnect", nil)
+	req.Header.Set("Authorization", "Bearer " + configs.stfApiToken)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
@@ -115,11 +159,11 @@ func getRemoteConnectUrl(serial string) string {
 	return remoteConnection.RemoteConnectUrl
 }
 
-func addDevice(serial string) {
+func addDevice(configs ConfigsModel, serial string) {
 	device := &Device{Serial: serial}
 	body, _ := json.Marshal(device)
-	req, _ := http.NewRequest("POST", stfHostUrl + userDevicesEndpoint, bytes.NewBuffer(body))
-	req.Header.Set("Authorization", "Bearer " + stfApiToken)
+	req, _ := http.NewRequest("POST", configs.stfHostUrl + userDevicesEndpoint, bytes.NewBuffer(body))
+	req.Header.Set("Authorization", "Bearer " + configs.stfApiToken)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
@@ -131,9 +175,9 @@ func addDevice(serial string) {
 	}
 }
 
-func getSerials() []string {
-	req, _ := http.NewRequest("GET", stfHostUrl + devicesEndpoint, nil)
-	req.Header.Set("Authorization", "Bearer " + stfApiToken)
+func getSerials(configs ConfigsModel) []string {
+	req, _ := http.NewRequest("GET", configs.stfHostUrl + devicesEndpoint, nil)
+	req.Header.Set("Authorization", "Bearer " + configs.stfApiToken)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -145,7 +189,7 @@ func getSerials() []string {
 		log.Fatalf("Could not get devices list: %s", resp.Status)
 	}
 
-	cmd := exec.Command("jq", "-r", ".devices[] | select(.present) | select(" + deviceQuery + ") | .serial")
+	cmd := exec.Command("jq", "-r", ".devices[] | select(.present) | select(" + configs.deviceQuery + ") | .serial")
 	cmd.Stdin = resp.Body
 
 	var stdout, stderr bytes.Buffer
@@ -158,11 +202,11 @@ func getSerials() []string {
 
 	serials := strings.Fields(stdout.String())
 	if len(serials) == 0 {
-		log.Fatalf("Could not find present devices satisfying query: %s", deviceQuery)
+		log.Fatalf("Could not find present devices satisfying query: %s", configs.deviceQuery)
 	}
 	shuffle(serials)
-	if (deviceNumberLimit < len(serials)) {
-		return serials[:deviceNumberLimit]
+	if configs.deviceNumberLimit > 0 && configs.deviceNumberLimit < len(serials) {
+		return serials[:configs.deviceNumberLimit]
 	}
 	return serials
 }
@@ -192,4 +236,3 @@ func exportArrayWithEnvman(keyStr string, values []string) {
 		log.Fatalf("Failed to expose output with envman, error: %s | output: %s", err, cmdLog)
 	}
 }
-
