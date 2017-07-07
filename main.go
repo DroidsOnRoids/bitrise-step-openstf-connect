@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"os/user"
 	"math/rand"
+	"strconv"
 )
 
 type Device struct {
@@ -29,13 +30,20 @@ const userDevicesEndpoint = "/api/v1/user/devices"
 var stfHostUrl = os.Getenv("stf_host_url")
 var stfToken = os.Getenv("stf_token")
 var deviceQuery = os.Getenv("device_query")
-var deviceNumberLimit = os.Getenv("device_number_limit")
+var deviceNumberLimit int
 var adbKeyPub = os.Getenv("adb_key_pub")
 var adbKey = os.Getenv("adb_key")
 
 var client = &http.Client{Timeout: time.Second * 10}
 
 func main() {
+	envDeviceNumberLimit := os.Getenv("device_number_limit")
+	i, err := strconv.Atoi(envDeviceNumberLimit)
+	if err != nil {
+		log.Fatalf("Invalid device number limit: %s %s", envDeviceNumberLimit, err)
+	}
+	deviceNumberLimit = i
+
 	serials := getSerials()
 	setAdbKeys()
 	exportArrayWithEnvman("STF_DEVICE_SERIALS", serials)
