@@ -161,7 +161,7 @@ func getSerials() []string {
 		log.Fatalf("Could not find present devices satisfying query: %s", deviceQuery)
 	}
 	shuffle(serials)
-	if (deviceNumberLimit > len(serials)) {
+	if (deviceNumberLimit < len(serials)) {
 		return serials[:deviceNumberLimit]
 	}
 	return serials
