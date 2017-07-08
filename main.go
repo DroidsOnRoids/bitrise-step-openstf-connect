@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"fmt"
+	"errors"
 )
 
 type ConfigsModel struct {
@@ -56,7 +58,7 @@ func getDeviceNumberLimitFromEnv() int {
 	}
 	i, err := strconv.Atoi(envDeviceNumberLimit)
 	if err != nil {
-		log.Fatalf("Device number limit: %s is not a number nor empty string", envDeviceNumberLimit)
+		log.Fatalf("Device number limit: '%s' is not a number nor empty string", envDeviceNumberLimit)
 	}
 	return i
 }
@@ -68,28 +70,25 @@ func (configs ConfigsModel) dump() {
 	log.Printf("Device number limit: %d", configs.deviceNumberLimit)
 }
 
-func (configs ConfigsModel) validate() {
+func (configs ConfigsModel) validate() error {
 	if !strings.HasPrefix(configs.stfHostUrl, "http") {
-		log.Fatalf("Invalid STF host: %s", configs.stfHostUrl)
+		return fmt.Errorf("Invalid STF host: %s", configs.stfHostUrl)
 	}
 	if configs.stfAccessToken == "" {
-		log.Fatal("STF access token cannot be empty")
-	}
-	if configs.adbKey == "" {
-		log.Fatal("Private ADB key cannot be empty")
-	}
-	if configs.adbKeyPub == "" {
-		log.Fatal("Public ADB key cannot be empty")
+		return errors.New("STF access token cannot be empty")
 	}
 	if configs.deviceQuery == "" {
 		configs.deviceQuery = "."
 	}
+	return nil
 }
 
 func main() {
 	configs := createConfigsModelFromEnvs()
 	configs.dump()
-	configs.validate()
+	if err := configs.validate(); err != nil {
+		log.Fatal(err)
+	}
 
 	serials := getSerials(configs)
 	setAdbKeys(configs)
@@ -105,18 +104,27 @@ func main() {
 func setAdbKeys(configs ConfigsModel) {
 	usr, err := user.Current()
 	if err != nil {
-		log.Fatalf("Could not determine current user %s", err)
+		log.Fatalf("Could not determine current user, error: %s", err)
 	}
 
-	adbKeyPath := filepath.Join(usr.HomeDir, ".android", "adbkey")
-	writeFile(adbKeyPath, configs.adbKey, 0644)
+	adbServerRestartNeeded := false
+	if configs.adbKey != "" {
+		adbKeyPath := filepath.Join(usr.HomeDir, ".android", "adbkey")
+		writeFile(adbKeyPath, configs.adbKey, 0644)
+		adbServerRestartNeeded = true
+	}
 
-	adbKeyPubPath := filepath.Join(usr.HomeDir, ".android", "adbkey.pub")
-	writeFile(adbKeyPubPath, configs.adbKeyPub, 0600)
+	if configs.adbKeyPub != "" {
+		adbKeyPubPath := filepath.Join(usr.HomeDir, ".android", "adbkey.pub")
+		writeFile(adbKeyPubPath, configs.adbKeyPub, 0600)
+		adbServerRestartNeeded = true
+	}
 
-	err = exec.Command(getAdbPath(), "kill-server").Run()
-	if err != nil {
-		log.Fatalf("Could not restart ADB server %s", err)
+	if (adbServerRestartNeeded) {
+		err = exec.Command(getAdbPath(), "kill-server").Run()
+		if err != nil {
+			log.Fatalf("Could not restart ADB server, error: %s", err)
+		}
 	}
 }
 
@@ -124,16 +132,16 @@ func writeFile(path string, content string, perm os.FileMode) {
 	data := []byte(content)
 	err := ioutil.WriteFile(path, data, perm)
 	if err != nil {
-		log.Fatalf("Could not write file %s %s", path, err)
+		log.Fatalf("Could not write file %s, error: %s", path, err)
 	}
 }
 
 func connectToAdb(remoteConnectUrl string) {
-	log.Printf("Connecting ADB to %s\n", remoteConnectUrl)
+	log.Printf("Connecting ADB to %s", remoteConnectUrl)
 	command := exec.Command(getAdbPath(), "connect", remoteConnectUrl)
 	output, err := command.CombinedOutput()
 	if err != nil {
-		log.Fatalf("ADB could not connect to %s %s", remoteConnectUrl, err)
+		log.Fatalf("ADB could not connect to %s, error: %s", remoteConnectUrl, err)
 	}
 	log.Println(string(output))
 }
@@ -144,20 +152,20 @@ func getRemoteConnectUrl(configs ConfigsModel, serial string) string {
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Fatalf("Could not get remote connect URL for: %s %s", serial, err)
+		log.Fatalf("Could not get remote connect URL for: %s, error: %s", serial, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		log.Fatalf("Could not get remote connect URL for: %s %s", serial, resp.Status)
+		log.Fatalf("Could not get remote connect URL for: %s, error: %s", serial, resp.Status)
 	}
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatalf("Could not get remote connect URL for: %s %s", serial, err)
+		log.Fatalf("Could not get remote connect URL for: %s, error: %s", serial, err)
 	}
 	var remoteConnection RemoteConnection
 	err = json.Unmarshal(bodyBytes, &remoteConnection)
 	if err != nil {
-		log.Fatalf("Could not get remote connect URL for: %s %s", serial, err)
+		log.Fatalf("Could not get remote connect URL for: %s, error: %s", serial, err)
 	}
 	return remoteConnection.RemoteConnectUrl
 }
@@ -168,13 +176,13 @@ func addDevice(configs ConfigsModel, serial string) {
 	req, _ := http.NewRequest("POST", configs.stfHostUrl + userDevicesEndpoint, bytes.NewBuffer(body))
 	req.Header.Set("Authorization", "Bearer " + configs.stfAccessToken)
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := client.Do(req)
+	response, err := client.Do(req)
 	if err != nil {
-		log.Fatalf("Could not add device with serial: %s under control: %s", serial, err)
+		log.Fatalf("Could not add device with serial: %s under control, error: %s", serial, err)
 	}
-	resp.Body.Close()
-	if resp.StatusCode != 200 {
-		log.Fatalf("Could not add device with serial: %s under control: %s", serial, resp.Status)
+	response.Body.Close()
+	if response.StatusCode != 200 {
+		log.Fatalf("Could not add device with serial: %s under control, error: %s", serial, response.Status)
 	}
 }
 
@@ -182,30 +190,30 @@ func getSerials(configs ConfigsModel) []string {
 	req, _ := http.NewRequest("GET", configs.stfHostUrl + devicesEndpoint, nil)
 	req.Header.Set("Authorization", "Bearer " + configs.stfAccessToken)
 
-	resp, err := client.Do(req)
+	response, err := client.Do(req)
 	if err != nil {
-		log.Fatalf("Could not get devices list: %s", err)
+		log.Fatalf("Could not get devices list, error: %s", err)
 	}
 
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		log.Fatalf("Could not get devices list: %s", resp.Status)
+	defer response.Body.Close()
+	if response.StatusCode != 200 {
+		log.Fatalf("Could not get devices list: %s, error:", response.Status)
 	}
 
-	cmd := exec.Command("jq", "-r", ".devices[] | select(.present) | select(" + configs.deviceQuery + ") | .serial")
-	cmd.Stdin = resp.Body
+	cmd := exec.Command("jq", "-r", ".devices[] | select(.present and .using == false and (" + configs.deviceQuery + ")) | .serial")
+	cmd.Stdin = response.Body
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	err = cmd.Run()
 	if err != nil {
-		log.Fatalf("Could not create GET devices list request: %s %s", err, stderr.String())
+		log.Fatalf("Could not create GET devices list request, error: %s | output: %s", err, stderr.String())
 	}
 
 	serials := strings.Fields(stdout.String())
 	if len(serials) == 0 {
-		log.Fatalf("Could not find present devices satisfying query: %s", configs.deviceQuery)
+		log.Fatalf("Could not find present, not used devices satisfying query: %s", configs.deviceQuery)
 	}
 	shuffle(serials)
 	if configs.deviceNumberLimit > 0 && configs.deviceNumberLimit < len(serials) {
