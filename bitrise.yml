@@ -105,7 +105,7 @@ workflows:
         inputs:
         - stf_host_url: $STF_HOST_URL
         - stf_access_token: $STF_ACCESS_TOKEN
-        - device_query: .sdk <= "17"
+        - device_filter: .sdk <= "17"
         - adb_key: $ADB_KEY
         - adb_key_pub: $ADB_KEY_PUB
     - script@1.1.4:

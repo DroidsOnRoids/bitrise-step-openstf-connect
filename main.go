@@ -21,7 +21,7 @@ import (
 type configsModel struct {
 	stfHostURL        string
 	stfAccessToken    string
-	deviceQuery       string
+	deviceFilter      string
 	deviceNumberLimit int
 	adbKeyPub         string
 	adbKey            string
@@ -83,7 +83,7 @@ func createConfigsModelFromEnvs() configsModel {
 	return configsModel{
 		stfHostURL:        os.Getenv("stf_host_url"),
 		stfAccessToken:    os.Getenv("stf_access_token"),
-		deviceQuery:       getEnvOrDefault("device_query", "."),
+		deviceFilter:       getEnvOrDefault("device_filter", "."),
 		deviceNumberLimit: parseIntSafely(getEnvOrDefault("device_number_limit", "0")),
 		adbKeyPub:         os.Getenv("adb_key_pub"),
 		adbKey:            os.Getenv("adb_key"),
@@ -109,7 +109,7 @@ func parseIntSafely(limit string) int {
 func (configs configsModel) dump() {
 	log.Println("Config:")
 	log.Printf("STF host           : %s", configs.stfHostURL)
-	log.Printf("Device query       : %s", configs.deviceQuery)
+	log.Printf("Device filter       : %s", configs.deviceFilter)
 	log.Printf("Device number limit: %d", configs.deviceNumberLimit)
 }
 
@@ -244,7 +244,7 @@ func getSerials(configs configsModel) ([]string, error) {
 		return nil, fmt.Errorf("Request failed, status: %s", response.Status)
 	}
 
-	cmd := exec.Command("jq", "-r", ".devices[] | select(.present and .using == false and (" + configs.deviceQuery + ")) | .serial")
+	cmd := exec.Command("jq", "-r", ".devices[] | select(.present and .owner == null and (" + configs.deviceFilter + ")) | .serial")
 	cmd.Stdin = response.Body
 
 	var stdout, stderr bytes.Buffer
@@ -257,7 +257,7 @@ func getSerials(configs configsModel) ([]string, error) {
 
 	serials := strings.Fields(stdout.String())
 	if len(serials) == 0 {
-		return nil, fmt.Errorf("Could not find present, not used devices satisfying query: %s", configs.deviceQuery)
+		return nil, fmt.Errorf("Could not find present, not used devices satisfying filter: %s", configs.deviceFilter)
 	}
 	shuffleSlice(serials)
 	if configs.deviceNumberLimit > 0 && configs.deviceNumberLimit < len(serials) {

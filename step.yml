@@ -1,18 +1,10 @@
-#
-# A couple of useful guides & docs:
-#
-# - Main Bitrise CLI docs: https://github.com/bitrise-io/bitrise/tree/master/_docs
-# - Step Development Guideline: https://github.com/bitrise-io/bitrise/blob/master/_docs/step-development-guideline.md
-# - Bitrise.yml format spec: https://github.com/bitrise-io/bitrise/blob/master/_docs/bitrise-yml-format-spec.md
-# - Bitrise docs: http://devcenter.bitrise.io/
-# - Bitrise CLI guides: http://devcenter.bitrise.io/bitrise-cli/
-
 title: |-
   OpenSTF Connect
 summary: |
-  Connects with Open Smartphone Test Farm
+  Connects with devices from Open Smartphone Test Farm
 description: |
-  TODO
+  To use this step, you need an access to running [Open STF](https://openstf.io/) instance with at least 1 device connected.
+  [Access token](https://github.com/openstf/stf/blob/master/doc/API.md#authentication) and ADB keys has to be set up using STF web UI.
 website: https://github.com/DroidsOnRoids/bitrise-step-openstf-connect
 source_code_url: https://github.com/DroidsOnRoids/bitrise-step-openstf-connect
 support_url: https://github.com/DroidsOnRoids/bitrise-step-openstf-connect/issues
@@ -46,7 +38,7 @@ inputs:
   - stf_host_url:
     opts:
       title: STF Host URL
-      summary: OpenSTF host URL, required.
+      summary: OpenSTF host URL.
       description: |
         URL of your STF instance e.g. `https://stf.example.com`
       is_required: true
@@ -55,54 +47,58 @@ inputs:
   - stf_access_token:
     opts:
       title: STF API access token
-      summary: STF API access token, required. Go to `Settings->Keys` on your STF web UI to generate one.
+      summary: STF API access token. Go to `Settings->Keys` on your STF web UI to generate one.
       description: |
         Read more about tokens in [OpenSTF API documentation](https://github.com/openstf/stf/blob/master/doc/API.md#authentication).
       is_required: true
       is_expand: true
 
-  - device_query: "."
+  - device_filter: "."
     opts:
       title: Device requirements e.g. API level
-      summary: Summary. No more than 2-3 sentences.
-      description: |
-        Description of this input.
+      summary: Optional device requirements e.g. API level or manufacturer declared as jq select expression. For example to use only devices with API level 21 or newer `.sdk >= "21"`. Only present and not used devices are taken into account.
+      description: |-
+        If not empty will be passed to `jq` as a select expression. Syntax details can be found in [jq manual](https://stedolan.github.io/jq/manual/#select(boolean_expression)).
+        Non-matching devices will be filtered out. Note that `.present and .owner == null` filter is applied implicitly so you don't need to add it manually.
       is_required: false
       is_expand: true
 
-  - device_number_limit: "3"
+  - device_number_limit:
     opts:
-      title: "limit"
-      summary: Summary. No more than 2-3 sentences.
+      title: Device number limit
+      summary: Maximum number of devices to be used. 0 and empty mean unlimited.
       description: |
-        Description of this input.
+        If there is more available devices (after applying filter if any), only amount up to this number will be used. Devices will be chosen randomly.
       is_required: false
       is_expand: true
 
   - adb_key:
     opts:
-      title: "adb key"
-      summary: Summary. No more than 2-3 sentences.
+      title: Private ADB key
+      summary: Private ADB key to be used when debugging on STF devices. If not empty value will be saved to `~/.android/adbkey`.
       description: |
-        Description of this input.
-      is_required: true
+        Private ADB key used during build has to be registered in STF under `Settings->Keys->ADB Keys`.
+        You have to either provide value here or modify `~/.android/adbkey` before this step.
+        Otherwise devices will be listed as unauthorized and cannot be used during build.
+      is_required: false
       is_expand: true
 
   - adb_key_pub:
     opts:
-      title: "adb key pub"
-      summary: Summary. No more than 2-3 sentences.
+      title: Public ADB key
+      summary: Public ADB key to be used when debugging on STF devices. If not empty value will be saved to `~/.android/adbkey.pub`.
       description: |
-        Description of this input.
-      is_required: true
+        Public ADB key used during build has to be registered in STF under `Settings->Keys->ADB Keys`.
+        You have to either provide value here or modify `~/.android/adbkey.pub` before this step.
+        Otherwise devices will be listed as unauthorized and cannot be used during build.
+      is_required: false
       is_expand: true
 
 outputs:
   - STF_DEVICE_SERIAL_LIST:
     opts:
-      title: "Example Step Output"
-      summary: Summary. No more than 2-3 sentences.
+      title: Connected devices serials
+      summary: List of serials of connected devices in JSON string array format.
       description: |
-        Description of this output.
-
-        Can be Markdown formatted text.
+        List of serials to be used to disconnect devices after tests in next steps.
+        List will contain serials of all present and not used devices, even those for which connection has failed.
