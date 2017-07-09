@@ -18,8 +18,8 @@ import (
 	"errors"
 )
 
-type ConfigsModel struct {
-	stfHostUrl        string
+type configsModel struct {
+	stfHostURL        string
 	stfAccessToken    string
 	deviceQuery       string
 	deviceNumberLimit int
@@ -27,12 +27,14 @@ type ConfigsModel struct {
 	adbKey            string
 }
 
+//Device ...
 type Device struct {
 	Serial string `json:"serial"`
 }
 
+//RemoteConnection ...
 type RemoteConnection struct {
-	RemoteConnectUrl string `json:"remoteConnectUrl"`
+	RemoteConnectURL string `json:"remoteConnectUrl"`
 }
 
 const devicesEndpoint = "/api/v1/devices"
@@ -40,164 +42,206 @@ const userDevicesEndpoint = "/api/v1/user/devices"
 
 var client = &http.Client{Timeout: time.Second * 10}
 
-func createConfigsModelFromEnvs() ConfigsModel {
-	return ConfigsModel{
-		stfHostUrl:        os.Getenv("stf_host_url"),
+func main() {
+	configs := createConfigsModelFromEnvs()
+	configs.dump()
+	if err := configs.validate(); err != nil {
+		log.Fatalf("Could not validate config, error: %s", err)
+	}
+
+	serials, err := getSerials(configs)
+	if err != nil {
+		log.Fatalf("Could get device serials, error: %s", err)
+	}
+	homeDir, err := getHomeDir()
+	if err != nil {
+		log.Fatalf("Could not determine current user home directory, error: %s", err)
+	}
+
+	if err := setAdbKeys(configs, homeDir); err != nil {
+		log.Fatalf("Could not set ADB keys, error: %s", err)
+	}
+	if err := exportArrayWithEnvman("STF_DEVICE_SERIAL_LIST", serials); err != nil {
+		log.Fatalf("Could export device serials with envman, error: %s", err)
+	}
+
+	for _, serial := range serials {
+		if err := addDevice(configs, serial); err != nil {
+			log.Fatalf("Could add device under control, error: %s", err)
+		}
+		remoteConnectURL, err := getRemoteConnectURL(configs, serial)
+		if err != nil {
+			log.Fatalf("Could not get remote connect URL to device %s, error: %s", serial, err)
+		}
+		if err := connectToAdb(remoteConnectURL); err != nil {
+			log.Fatalf("Could not connect device %s to ADB, error: %s", serial, err)
+		}
+	}
+}
+
+func createConfigsModelFromEnvs() configsModel {
+	return configsModel{
+		stfHostURL:        os.Getenv("stf_host_url"),
 		stfAccessToken:    os.Getenv("stf_access_token"),
-		deviceQuery:       os.Getenv("device_query"),
-		deviceNumberLimit: getDeviceNumberLimitFromEnv(),
+		deviceQuery:       getEnvOrDefault("device_query", "."),
+		deviceNumberLimit: parseIntSafely(getEnvOrDefault("device_number_limit", "0")),
 		adbKeyPub:         os.Getenv("adb_key_pub"),
 		adbKey:            os.Getenv("adb_key"),
 	}
 }
 
-func getDeviceNumberLimitFromEnv() int {
-	envDeviceNumberLimit := os.Getenv("device_number_limit")
-	if envDeviceNumberLimit == "" {
-		return 0
+func getEnvOrDefault(key string, defaultValue string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
 	}
-	i, err := strconv.Atoi(envDeviceNumberLimit)
+	return value
+}
+
+func parseIntSafely(limit string) int {
+	i, err := strconv.Atoi(limit)
 	if err != nil {
-		log.Fatalf("Device number limit: '%s' is not a number nor empty string", envDeviceNumberLimit)
+		return 0
 	}
 	return i
 }
 
-func (configs ConfigsModel) dump() {
-	log.Println("Configs:")
-	log.Printf("STF host           : %s", configs.stfHostUrl)
+func (configs configsModel) dump() {
+	log.Println("Config:")
+	log.Printf("STF host           : %s", configs.stfHostURL)
 	log.Printf("Device query       : %s", configs.deviceQuery)
 	log.Printf("Device number limit: %d", configs.deviceNumberLimit)
 }
 
-func (configs ConfigsModel) validate() error {
-	if !strings.HasPrefix(configs.stfHostUrl, "http") {
-		return fmt.Errorf("Invalid STF host: %s", configs.stfHostUrl)
+func (configs *configsModel) validate() error {
+	if !strings.HasPrefix(configs.stfHostURL, "http") {
+		return fmt.Errorf("Invalid STF host: %s", configs.stfHostURL)
 	}
 	if configs.stfAccessToken == "" {
 		return errors.New("STF access token cannot be empty")
 	}
-	if configs.deviceQuery == "" {
-		configs.deviceQuery = "."
+	return nil
+}
+
+func (configs *configsModel) isAnyAdbKeySet() bool {
+	return configs.adbKey != "" || configs.adbKeyPub != ""
+}
+
+func setAdbKeys(configs configsModel, homeDir string) error {
+	if err := saveNonEmptyAdbKey(configs.adbKey, homeDir, "adbkey", 0600); err != nil {
+		return err
+	}
+	if err := saveNonEmptyAdbKey(configs.adbKeyPub, homeDir, "adbkey.pub", 0644); err != nil {
+		return err
+	}
+	if configs.isAnyAdbKeySet() {
+		return exec.Command(getAdbPath(), "kill-server").Run()
 	}
 	return nil
 }
 
-func main() {
-	configs := createConfigsModelFromEnvs()
-	configs.dump()
-	if err := configs.validate(); err != nil {
-		log.Fatal(err)
-	}
-
-	serials := getSerials(configs)
-	setAdbKeys(configs)
-	exportArrayWithEnvman("STF_DEVICE_SERIAL_LIST", serials)
-
-	for _, serial := range serials {
-		addDevice(configs, serial)
-		remoteConnectUrl := getRemoteConnectUrl(configs, serial)
-		connectToAdb(remoteConnectUrl)
-	}
-}
-
-func setAdbKeys(configs ConfigsModel) {
-	usr, err := user.Current()
-	if err != nil {
-		log.Fatalf("Could not determine current user, error: %s", err)
-	}
-
-	adbServerRestartNeeded := false
-	if configs.adbKey != "" {
-		adbKeyPath := filepath.Join(usr.HomeDir, ".android", "adbkey")
-		writeFile(adbKeyPath, configs.adbKey, 0644)
-		adbServerRestartNeeded = true
-	}
-
-	if configs.adbKeyPub != "" {
-		adbKeyPubPath := filepath.Join(usr.HomeDir, ".android", "adbkey.pub")
-		writeFile(adbKeyPubPath, configs.adbKeyPub, 0600)
-		adbServerRestartNeeded = true
-	}
-
-	if (adbServerRestartNeeded) {
-		err = exec.Command(getAdbPath(), "kill-server").Run()
-		if err != nil {
-			log.Fatalf("Could not restart ADB server, error: %s", err)
+func saveNonEmptyAdbKey(key, homeDir, fileName string, mode os.FileMode) error {
+	if key != "" {
+		adbKeyPath := filepath.Join(homeDir, ".android", fileName)
+		if err := ioutil.WriteFile(adbKeyPath, []byte(key), mode); err != nil {
+			return err
 		}
 	}
+	return nil
 }
 
-func writeFile(path string, content string, perm os.FileMode) {
-	data := []byte(content)
-	err := ioutil.WriteFile(path, data, perm)
+func getHomeDir() (string, error) {
+	currentUser, err := user.Current()
 	if err != nil {
-		log.Fatalf("Could not write file %s, error: %s", path, err)
+		return "", err
 	}
+	return currentUser.HomeDir, nil
 }
 
-func connectToAdb(remoteConnectUrl string) {
-	log.Printf("Connecting ADB to %s", remoteConnectUrl)
-	command := exec.Command(getAdbPath(), "connect", remoteConnectUrl)
+func connectToAdb(remoteConnectURL string) error {
+	log.Printf("Connecting ADB to %s", remoteConnectURL)
+	command := exec.Command(getAdbPath(), "connect", remoteConnectURL)
 	output, err := command.CombinedOutput()
 	if err != nil {
-		log.Fatalf("ADB could not connect to %s, error: %s", remoteConnectUrl, err)
+		return err
 	}
 	log.Println(string(output))
+	return nil
 }
 
-func getRemoteConnectUrl(configs ConfigsModel, serial string) string {
-	req, _ := http.NewRequest("POST", configs.stfHostUrl + userDevicesEndpoint + "/" + serial + "/remoteConnect", nil)
+func getRemoteConnectURL(configs configsModel, serial string) (string, error) {
+	req, err := http.NewRequest("POST", configs.stfHostURL + userDevicesEndpoint + "/" + serial + "/remoteConnect", nil)
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("Authorization", "Bearer " + configs.stfAccessToken)
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := client.Do(req)
+	response, err := client.Do(req)
 	if err != nil {
-		log.Fatalf("Could not get remote connect URL for: %s, error: %s", serial, err)
+		return "", err
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		log.Fatalf("Could not get remote connect URL for: %s, error: %s", serial, resp.Status)
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			log.Printf("Failed to close response body, error: %s", err)
+		}
+	}()
+	bodyBytes, err := ioutil.ReadAll(response.Body)
+	if response.StatusCode != 200 {
+		return "", fmt.Errorf("Request failed, status: %s | body: %s", response.Status, string(bodyBytes))
 	}
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatalf("Could not get remote connect URL for: %s, error: %s", serial, err)
+		return "", err
 	}
 	var remoteConnection RemoteConnection
 	err = json.Unmarshal(bodyBytes, &remoteConnection)
-	if err != nil {
-		log.Fatalf("Could not get remote connect URL for: %s, error: %s", serial, err)
-	}
-	return remoteConnection.RemoteConnectUrl
+	return remoteConnection.RemoteConnectURL, err
 }
 
-func addDevice(configs ConfigsModel, serial string) {
+func addDevice(configs configsModel, serial string) error {
 	device := &Device{Serial: serial}
-	body, _ := json.Marshal(device)
-	req, _ := http.NewRequest("POST", configs.stfHostUrl + userDevicesEndpoint, bytes.NewBuffer(body))
+	body, err := json.Marshal(device)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequest("POST", configs.stfHostURL + userDevicesEndpoint, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
 	req.Header.Set("Authorization", "Bearer " + configs.stfAccessToken)
 	req.Header.Set("Content-Type", "application/json")
 	response, err := client.Do(req)
 	if err != nil {
-		log.Fatalf("Could not add device with serial: %s under control, error: %s", serial, err)
+		return err
 	}
-	response.Body.Close()
+	if err := response.Body.Close(); err != nil {
+		return err
+	}
 	if response.StatusCode != 200 {
-		log.Fatalf("Could not add device with serial: %s under control, error: %s", serial, response.Status)
+		return fmt.Errorf("Request failed, status: %s", response.Status)
 	}
+	return nil
 }
 
-func getSerials(configs ConfigsModel) []string {
-	req, _ := http.NewRequest("GET", configs.stfHostUrl + devicesEndpoint, nil)
+func getSerials(configs configsModel) ([]string, error) {
+	req, err := http.NewRequest("GET", configs.stfHostURL + devicesEndpoint, nil)
+	if err != nil {
+		return nil, err
+	}
 	req.Header.Set("Authorization", "Bearer " + configs.stfAccessToken)
 
 	response, err := client.Do(req)
 	if err != nil {
-		log.Fatalf("Could not get devices list, error: %s", err)
+		return nil, err
 	}
 
-	defer response.Body.Close()
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			log.Printf("Failed to close response body, error: %s", err)
+		}
+	}()
+
 	if response.StatusCode != 200 {
-		log.Fatalf("Could not get devices list: %s, error:", response.Status)
+		return nil, fmt.Errorf("Request failed, status: %s", response.Status)
 	}
 
 	cmd := exec.Command("jq", "-r", ".devices[] | select(.present and .using == false and (" + configs.deviceQuery + ")) | .serial")
@@ -208,21 +252,21 @@ func getSerials(configs ConfigsModel) []string {
 	cmd.Stderr = &stderr
 	err = cmd.Run()
 	if err != nil {
-		log.Fatalf("Could not create GET devices list request, error: %s | output: %s", err, stderr.String())
+		return nil, fmt.Errorf("Could not create GET devices list request, error: %s | output: %s", err, stderr.String())
 	}
 
 	serials := strings.Fields(stdout.String())
 	if len(serials) == 0 {
-		log.Fatalf("Could not find present, not used devices satisfying query: %s", configs.deviceQuery)
+		return nil, fmt.Errorf("Could not find present, not used devices satisfying query: %s", configs.deviceQuery)
 	}
-	shuffle(serials)
+	shuffleSlice(serials)
 	if configs.deviceNumberLimit > 0 && configs.deviceNumberLimit < len(serials) {
-		return serials[:configs.deviceNumberLimit]
+		return serials[:configs.deviceNumberLimit], nil
 	}
-	return serials
+	return serials, nil
 }
 
-func shuffle(slice []string) {
+func shuffleSlice(slice []string) {
 	for i := range slice {
 		j := rand.Intn(i + 1)
 		slice[i], slice[j] = slice[j], slice[i]
@@ -230,20 +274,17 @@ func shuffle(slice []string) {
 }
 
 func getAdbPath() string {
-	android_home := os.Getenv("ANDROID_HOME")
-	if android_home == "" {
+	androidHome := os.Getenv("ANDROID_HOME")
+	if androidHome == "" {
 		return "adb"
 	}
-	return filepath.Join(android_home, "platform-tools", "adb")
+	return filepath.Join(androidHome, "platform-tools", "adb")
 }
 
-func exportArrayWithEnvman(keyStr string, values []string) {
+func exportArrayWithEnvman(keyStr string, values []string) error {
 	body, err := json.Marshal(values)
 	if err != nil {
-		log.Fatalf("Failed to expose output with envman, error: %s", err)
+		return err
 	}
-	cmdLog, err := exec.Command("bitrise", "envman", "add", "--key", keyStr, "--value", string(body)).CombinedOutput()
-	if err != nil {
-		log.Fatalf("Failed to expose output with envman, error: %s | output: %s", err, cmdLog)
-	}
+	return exec.Command("bitrise", "envman", "add", "--key", keyStr, "--value", string(body)).Run()
 }

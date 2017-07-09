@@ -12,7 +12,7 @@ title: |-
 summary: |
   Connects with Open Smartphone Test Farm
 description: |
-  desc
+  TODO
 website: https://github.com/DroidsOnRoids/bitrise-step-openstf-connect
 source_code_url: https://github.com/DroidsOnRoids/bitrise-step-openstf-connect
 support_url: https://github.com/DroidsOnRoids/bitrise-step-openstf-connect/issues
