@@ -108,8 +108,8 @@ func parseIntSafely(limit string) int {
 
 func (configs configsModel) dump() {
 	log.Println("Config:")
-	log.Printf("STF host           : %s", configs.stfHostURL)
-	log.Printf("Device filter       : %s", configs.deviceFilter)
+	log.Printf("STF host: %s", configs.stfHostURL)
+	log.Printf("Device filter: %s", configs.deviceFilter)
 	log.Printf("Device number limit: %d", configs.deviceNumberLimit)
 }
 

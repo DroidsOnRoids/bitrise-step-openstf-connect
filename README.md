@@ -1,6 +1,6 @@
-# stf-connect
+# openstf-connect
 
-desc
+Bitrise step for [Open STF](https://openstf.io/) devices connection.
 
 
 ## How to use this Step
