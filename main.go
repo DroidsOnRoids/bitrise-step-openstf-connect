@@ -66,7 +66,7 @@ func main() {
 	}
 
 	for _, serial := range serials {
-		if err := addDevice(configs, serial); err != nil {
+		if err := addDeviceUnderControl(configs, serial); err != nil {
 			log.Fatalf("Could add device under control, error: %s", err)
 		}
 		remoteConnectURL, err := getRemoteConnectURL(configs, serial)
@@ -83,7 +83,7 @@ func createConfigsModelFromEnvs() configsModel {
 	return configsModel{
 		stfHostURL:        os.Getenv("stf_host_url"),
 		stfAccessToken:    os.Getenv("stf_access_token"),
-		deviceFilter:       getEnvOrDefault("device_filter", "."),
+		deviceFilter:      getEnvOrDefault("device_filter", "."),
 		deviceNumberLimit: parseIntSafely(getEnvOrDefault("device_number_limit", "0")),
 		adbKeyPub:         os.Getenv("adb_key_pub"),
 		adbKey:            os.Getenv("adb_key"),
@@ -197,7 +197,7 @@ func getRemoteConnectURL(configs configsModel, serial string) (string, error) {
 	return remoteConnection.RemoteConnectURL, err
 }
 
-func addDevice(configs configsModel, serial string) error {
+func addDeviceUnderControl(configs configsModel, serial string) error {
 	device := &Device{Serial: serial}
 	body, err := json.Marshal(device)
 	if err != nil {
