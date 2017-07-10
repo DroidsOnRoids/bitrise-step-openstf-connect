@@ -38,7 +38,6 @@ inputs:
   - stf_host_url:
     opts:
       title: STF Host URL
-      summary: OpenSTF host URL.
       description: |
         URL of your STF instance e.g. `https://stf.example.com`
       is_required: true
@@ -47,8 +46,8 @@ inputs:
   - stf_access_token:
     opts:
       title: STF API access token
-      summary: STF API access token. Go to `Settings->Keys` on your STF web UI to generate one.
       description: |
+        STF API access token. Go to `Settings->Keys` on your STF web UI to generate one.
         Read more about tokens in [OpenSTF API documentation](https://github.com/openstf/stf/blob/master/doc/API.md#authentication).
       is_required: true
       is_expand: true
@@ -66,8 +65,8 @@ inputs:
   - device_number_limit:
     opts:
       title: Device number limit
-      summary: Maximum number of devices to be used. 0 and empty mean unlimited.
       description: |
+        Maximum number of devices to be used. 0 and empty mean unlimited.
         If there is more available devices (after applying filter if any), only amount up to this number will be used. Devices will be chosen randomly.
       is_required: false
       is_expand: true
@@ -75,8 +74,8 @@ inputs:
   - adb_key:
     opts:
       title: Private ADB key
-      summary: Private ADB key to be used when debugging on STF devices. If not empty value will be saved to `~/.android/adbkey`.
       description: |
+        Private ADB key to be used when debugging on STF devices. If not empty value will be saved to `~/.android/adbkey`.
         Private ADB key used during build has to be registered in STF under `Settings->Keys->ADB Keys`.
         You have to either provide value here or modify `~/.android/adbkey` before this step.
         Otherwise devices will be listed as unauthorized and cannot be used during build.
@@ -86,8 +85,8 @@ inputs:
   - adb_key_pub:
     opts:
       title: Public ADB key
-      summary: Public ADB key to be used when debugging on STF devices. If not empty value will be saved to `~/.android/adbkey.pub`.
       description: |
+        Public ADB key to be used when debugging on STF devices. If not empty value will be saved to `~/.android/adbkey.pub`.
         Public ADB key used during build has to be registered in STF under `Settings->Keys->ADB Keys`.
         You have to either provide value here or modify `~/.android/adbkey.pub` before this step.
         Otherwise devices will be listed as unauthorized and cannot be used during build.
@@ -98,7 +97,6 @@ outputs:
   - STF_DEVICE_SERIAL_LIST:
     opts:
       title: Connected devices serials
-      summary: List of serials of connected devices in JSON string array format.
       description: |
-        List of serials to be used to disconnect devices after tests in next steps.
+        List of serials in JSON string array format to be used to disconnect devices after tests in next steps.
         List will contain serials of all present and not used devices, even those for which connection has failed.
