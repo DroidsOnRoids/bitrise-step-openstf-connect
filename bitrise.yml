@@ -54,6 +54,8 @@ workflows:
             bitrise share create --stepid "${BITRISE_STEP_ID}" --tag "${BITRISE_STEP_VERSION}" --git "${BITRISE_STEP_GIT_CLONE_URL}"
             bitrise share finish
   test:
+    envs:
+    - DEVICE_NUMBER_LIMIT: 2
     steps:
     - script:
         title: Install testing tools
@@ -105,11 +107,26 @@ workflows:
         inputs:
         - stf_host_url: $STF_HOST_URL
         - stf_access_token: $STF_ACCESS_TOKEN
-        - device_filter: .sdk <= "17"
+        - device_filter: .sdk <= "22"
+        - device_number_limit: $DEVICE_NUMBER_LIMIT
         - adb_key: $ADB_KEY
         - adb_key_pub: $ADB_KEY_PUB
-    - script@1.1.4:
+    - script:
         inputs:
         - content: |-
             #!/usr/bin/env bash
             echo "Connected devices serials: ${STF_DEVICE_SERIAL_LIST}"
+    - script:
+        run_if: '{{getenv "STF_HOST_URL" | ne ""}}'
+        title: Assert that there are connected devices
+        inputs:
+        - content: |-
+            #!/usr/bin/env bash
+            set -e
+            [[ $(adb devices | grep device$ -c) -eq "${DEVICE_NUMBER_LIMIT}" ]]
+    - openstf-disconnect:
+        title: Release devices
+        run_if: '{{getenv "STF_HOST_URL" | ne ""}}'
+        inputs:
+        - stf_host_url: $STF_HOST_URL
+        - stf_access_token: $STF_ACCESS_TOKEN
