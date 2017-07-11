@@ -51,7 +51,7 @@ func main() {
 
 	serials, err := getSerials(configs)
 	if err != nil {
-		log.Fatalf("Could get device serials, error: %s", err)
+		log.Fatalf("Could not get device serials, error: %s", err)
 	}
 	homeDir, err := getHomeDir()
 	if err != nil {
