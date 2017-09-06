@@ -16,6 +16,7 @@ import (
 	"time"
 	"fmt"
 	"errors"
+	"github.com/bitrise-io/go-utils/colorstring"
 )
 
 type configsModel struct {
@@ -46,37 +47,41 @@ func main() {
 	configs := createConfigsModelFromEnvs()
 	configs.dump()
 	if err := configs.validate(); err != nil {
-		log.Fatalf("Could not validate config, error: %s", err)
+		logError("Could not validate config, error: %s", err)
 	}
 
 	serials, err := getSerials(configs)
 	if err != nil {
-		log.Fatalf("Could not get device serials, error: %s", err)
+		logError("Could not get device serials, error: %s", err)
 	}
 	homeDir, err := getHomeDir()
 	if err != nil {
-		log.Fatalf("Could not determine current user home directory, error: %s", err)
+		logError("Could not determine current user home directory, error: %s", err)
 	}
 
 	if err := setAdbKeys(configs, homeDir); err != nil {
-		log.Fatalf("Could not set ADB keys, error: %s", err)
+		logError("Could not set ADB keys, error: %s", err)
 	}
 	if err := exportArrayWithEnvman("STF_DEVICE_SERIAL_LIST", serials); err != nil {
-		log.Fatalf("Could export device serials with envman, error: %s", err)
+		logError("Could export device serials with envman, error: %s", err)
 	}
 
 	for _, serial := range serials {
 		if err := addDeviceUnderControl(configs, serial); err != nil {
-			log.Fatalf("Could add device under control, error: %s", err)
+			logError("Could add device under control, error: %s", err)
 		}
 		remoteConnectURL, err := getRemoteConnectURL(configs, serial)
 		if err != nil {
-			log.Fatalf("Could not get remote connect URL to device %s, error: %s", serial, err)
+			logError("Could not get remote connect URL to device %s, error: %s", serial, err)
 		}
 		if err := connectToAdb(remoteConnectURL); err != nil {
-			log.Fatalf("Could not connect device %s to ADB, error: %s", serial, err)
+			logError("Could not connect device %s to ADB, error: %s", serial, err)
 		}
 	}
+}
+
+func logError(format string, v ...interface{}){
+	log.Fatalf(colorstring.Red(format), v)
 }
 
 func createConfigsModelFromEnvs() configsModel {
@@ -107,7 +112,7 @@ func parseIntSafely(limit string) int {
 }
 
 func (configs configsModel) dump() {
-	log.Println("Config:")
+	log.Println(colorstring.Blue("Config:"))
 	log.Printf("STF host: %s", configs.stfHostURL)
 	log.Printf("Device filter: %s", configs.deviceFilter)
 	log.Printf("Device number limit: %d", configs.deviceNumberLimit)
@@ -159,7 +164,7 @@ func getHomeDir() (string, error) {
 }
 
 func connectToAdb(remoteConnectURL string) error {
-	log.Printf("Connecting ADB to %s", remoteConnectURL)
+	log.Printf(colorstring.Blue("Connecting ADB to %s"), remoteConnectURL)
 	command := exec.Command(getAdbPath(), "connect", remoteConnectURL)
 	output, err := command.CombinedOutput()
 	if err != nil {
