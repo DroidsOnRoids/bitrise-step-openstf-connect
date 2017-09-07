@@ -6,10 +6,15 @@ description: |
   To use this step, you need an access to running [Open STF](https://openstf.io/) instance with at least 1 device connected.
   [Access token](https://github.com/openstf/stf/blob/master/doc/API.md#authentication) and ADB keys has to be set up using STF web UI.
   Typical workflow:
-  1. App compilation e.g. using Gradle Runner step
-  2. Open STF Connect (this step)
-  3. Android instrumention and/or UI tests e.g. using Gradle Unit Test step
-  4. Open STF Disconnect step with `is_always_run: true` (to stop using remote devices)
+
+  1. App compilation e.g. using Gradle Runner step.
+
+  2. Open STF Connect (this step).
+
+  3. Android instrumention and/or UI tests e.g. using Gradle Unit Test step.
+
+  4. Open STF Disconnect step with `is_always_run: true` (to stop using remote devices).
+
 website: https://github.com/DroidsOnRoids/bitrise-step-openstf-connect
 source_code_url: https://github.com/DroidsOnRoids/bitrise-step-openstf-connect
 support_url: https://github.com/DroidsOnRoids/bitrise-step-openstf-connect/issues
@@ -72,7 +77,7 @@ inputs:
       title: Device number limit
       description: |
         Maximum number of devices to be used. 0 and empty mean unlimited.
-        If there is more available devices (after applying filter if any), only amount up to this number will be used. Devices will be chosen randomly.
+        If there are more available devices (after applying filter if any), only amount up to this number will be used. Devices will be chosen randomly.
       is_required: false
       is_expand: true
 
@@ -81,7 +86,7 @@ inputs:
       title: Private ADB key
       description: |
         Private ADB key to be used when debugging on STF devices. If not empty value will be saved to `~/.android/adbkey`.
-        Private ADB key used during build has to be registered in STF under `Settings->Keys->ADB Keys`.
+        Key used during build has to be registered in STF under `Settings->Keys->ADB Keys`.
         You have to either provide value here or modify `~/.android/adbkey` before this step.
         Otherwise devices will be listed as unauthorized and cannot be used during build.
       is_required: false
@@ -92,7 +97,7 @@ inputs:
       title: Public ADB key
       description: |
         Public ADB key to be used when debugging on STF devices. If not empty value will be saved to `~/.android/adbkey.pub`.
-        Public ADB key used during build has to be registered in STF under `Settings->Keys->ADB Keys`.
+        Key used during build has to be registered in STF under `Settings->Keys->ADB Keys`.
         You have to either provide value here or modify `~/.android/adbkey.pub` before this step.
         Otherwise devices will be listed as unauthorized and cannot be used during build.
       is_required: false
