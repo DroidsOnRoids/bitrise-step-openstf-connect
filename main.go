@@ -40,6 +40,7 @@ type RemoteConnection struct {
 
 const devicesEndpoint = "/api/v1/devices"
 const userDevicesEndpoint = "/api/v1/user/devices"
+const random = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 var client = &http.Client{Timeout: time.Second * 10}
 
@@ -80,7 +81,7 @@ func main() {
 	}
 }
 
-func logError(format string, v ...interface{}){
+func logError(format string, v ...interface{}) {
 	log.Fatalf(colorstring.Red(format), v)
 }
 
@@ -273,7 +274,7 @@ func getSerials(configs configsModel) ([]string, error) {
 
 func shuffleSlice(slice []string) {
 	for i := range slice {
-		j := rand.Intn(i + 1)
+		j := random.Intn(i + 1)
 		slice[i], slice[j] = slice[j], slice[i]
 	}
 }
