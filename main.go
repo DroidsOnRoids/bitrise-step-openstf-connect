@@ -40,7 +40,7 @@ type RemoteConnection struct {
 
 const devicesEndpoint = "/api/v1/devices"
 const userDevicesEndpoint = "/api/v1/user/devices"
-const random = rand.New(rand.NewSource(time.Now().UnixNano()))
+var random = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 var client = &http.Client{Timeout: time.Second * 10}
 
