@@ -161,3 +161,18 @@ func TestGetAdbPath(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, info.IsDir())
 }
+
+func TestCalculateDeviceCountNoLimit(t *testing.T) {
+	configs := configsModel{deviceNumberLimit:0}
+	require.Equal(t, 2, calculateDeviceCount(configs, []string{"1", "2"}))
+}
+
+func TestCalculateDeviceCountLimitLargerThanNumberOfDevices(t *testing.T) {
+	configs := configsModel{deviceNumberLimit:3}
+	require.Equal(t, 2, calculateDeviceCount(configs, []string{"1", "2"}))
+}
+
+func TestCalculateLimitedDeviceCount(t *testing.T) {
+	configs := configsModel{deviceNumberLimit:1}
+	require.Equal(t, 1, calculateDeviceCount(configs, []string{"1", "2"}))
+}
