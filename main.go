@@ -40,6 +40,7 @@ type RemoteConnection struct {
 
 const devicesEndpoint = "/api/v1/devices"
 const userDevicesEndpoint = "/api/v1/user/devices"
+
 var random = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 var client = &http.Client{Timeout: time.Second * 10}
@@ -63,22 +64,50 @@ func main() {
 	if err := setAdbKeys(configs, homeDir); err != nil {
 		logError("Could not set ADB keys, error: %s", err)
 	}
-	if err := exportArrayWithEnvman("STF_DEVICE_SERIAL_LIST", serials); err != nil {
-		logError("Could export device serials with envman, error: %s", err)
+
+	deviceCount := calculateDeviceCount(configs, serials)
+	connectedDeviceSerials := []string{}
+
+	connectedDeviceCount := 0
+	for _, serial := range serials {
+		if err := connectDeviceToADB(configs, serial); err != nil {
+			log.Printf(colorstring.Yellowf("%s", err))
+		} else {
+			connectedDeviceCount++
+			connectedDeviceSerials = append(connectedDeviceSerials, serial)
+		}
+		if connectedDeviceCount >= deviceCount {
+			break
+		}
 	}
 
-	for _, serial := range serials {
-		if err := addDeviceUnderControl(configs, serial); err != nil {
-			logError("Could add device under control, error: %s", err)
-		}
-		remoteConnectURL, err := getRemoteConnectURL(configs, serial)
-		if err != nil {
-			logError("Could not get remote connect URL to device %s, error: %s", serial, err)
-		}
-		if err := connectToAdb(remoteConnectURL); err != nil {
-			logError("Could not connect device %s to ADB, error: %s", serial, err)
-		}
+	if err := exportArrayWithEnvman("STF_DEVICE_SERIAL_LIST", connectedDeviceSerials); err != nil {
+		logError("Could export device serials with envman, error: %s", err)
 	}
+	if connectedDeviceCount == 0 {
+		logError("No devices can be connected to ADB")
+	}
+}
+
+func calculateDeviceCount(configs configsModel, serials []string) int {
+	if configs.deviceNumberLimit > 0 && configs.deviceNumberLimit < len(serials) {
+		return configs.deviceNumberLimit
+	}
+	return len(serials)
+}
+
+func connectDeviceToADB(configs configsModel, serial string) error {
+	if err := addDeviceUnderControl(configs, serial); err != nil {
+		return fmt.Errorf("Could add device under control, error: %s", err)
+	}
+	remoteConnectURL, err := getRemoteConnectURL(configs, serial)
+	if err != nil {
+		return fmt.Errorf("Could not get remote connect URL to device %s, error: %s", serial, err)
+	}
+	if err := connectToAdb(remoteConnectURL); err != nil {
+		return fmt.Errorf("Could not connect device %s to ADB, error: %s", serial, err)
+	}
+	return nil
 }
 
 func logError(format string, v ...interface{}) {
@@ -266,9 +295,6 @@ func getSerials(configs configsModel) ([]string, error) {
 		return nil, fmt.Errorf("Could not find present, not used devices satisfying filter: %s", configs.deviceFilter)
 	}
 	shuffleSlice(serials)
-	if configs.deviceNumberLimit > 0 && configs.deviceNumberLimit < len(serials) {
-		return serials[:configs.deviceNumberLimit], nil
-	}
 	return serials, nil
 }
 
