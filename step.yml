@@ -61,6 +61,7 @@ inputs:
         Read more about tokens in [OpenSTF API documentation](https://github.com/openstf/stf/blob/master/doc/API.md#authentication).
       is_required: true
       is_expand: true
+      is_sensitive: true
 
   - device_filter: "."
     opts:
@@ -91,6 +92,7 @@ inputs:
         Otherwise devices will be listed as unauthorized and cannot be used during build.
       is_required: false
       is_expand: true
+      is_sensitive: true
 
   - adb_key_pub:
     opts:
@@ -109,4 +111,4 @@ outputs:
       title: Connected devices serials
       description: |
         List of serials in JSON string array format to be used to disconnect devices after tests in next steps.
-        List will contain serials of all present and not used devices, even those for which connection has failed.
+        List will contain serials of all present and not used devices (matching filter if any), even those for which connection has failed.
