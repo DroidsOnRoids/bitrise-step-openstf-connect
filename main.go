@@ -150,7 +150,7 @@ func (configs configsModel) dump() {
 
 func (configs *configsModel) validate() error {
 	if !strings.HasPrefix(configs.stfHostURL, "http") {
-		return fmt.Errorf("Invalid STF host: %s", configs.stfHostURL)
+		return fmt.Errorf("invalid STF host: %s", configs.stfHostURL)
 	}
 	if configs.stfAccessToken == "" {
 		return errors.New("STF access token cannot be empty")
@@ -222,7 +222,7 @@ func getRemoteConnectURL(configs configsModel, serial string) (string, error) {
 	}()
 	bodyBytes, err := ioutil.ReadAll(response.Body)
 	if response.StatusCode != 200 {
-		return "", fmt.Errorf("Request failed, status: %s | body: %s", response.Status, string(bodyBytes))
+		return "", fmt.Errorf("request failed, status: %s | body: %s", response.Status, string(bodyBytes))
 	}
 	if err != nil {
 		return "", err
@@ -252,7 +252,7 @@ func addDeviceUnderControl(configs configsModel, serial string) error {
 		return err
 	}
 	if response.StatusCode != 200 {
-		return fmt.Errorf("Request failed, status: %s", response.Status)
+		return fmt.Errorf("request failed, status: %s", response.Status)
 	}
 	return nil
 }
@@ -276,7 +276,7 @@ func getSerials(configs configsModel) ([]string, error) {
 	}()
 
 	if response.StatusCode != 200 {
-		return nil, fmt.Errorf("Request failed, status: %s", response.Status)
+		return nil, fmt.Errorf("request failed, status: %s", response.Status)
 	}
 
 	cmd := exec.Command("jq", "-r", ".devices[] | select(.present and .owner == null and (" + configs.deviceFilter + ")) | .serial")
@@ -287,12 +287,12 @@ func getSerials(configs configsModel) ([]string, error) {
 	cmd.Stderr = &stderr
 	err = cmd.Run()
 	if err != nil {
-		return nil, fmt.Errorf("Could not create GET devices list request, error: %s | output: %s", err, stderr.String())
+		return nil, fmt.Errorf("could not create GET devices list request, error: %s | output: %s", err, stderr.String())
 	}
 
 	serials := strings.Fields(stdout.String())
 	if len(serials) == 0 {
-		return nil, fmt.Errorf("Could not find present, not used devices satisfying filter: %s", configs.deviceFilter)
+		return nil, fmt.Errorf("could not find present, not used devices satisfying filter: %s", configs.deviceFilter)
 	}
 	shuffleSlice(serials)
 	return serials, nil
