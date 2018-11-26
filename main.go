@@ -42,7 +42,7 @@ const userDevicesEndpoint = "/api/v1/user/devices"
 
 var random = rand.New(rand.NewSource(time.Now().UnixNano()))
 
-var client = &http.Client{Timeout: time.Second * 10}
+var client = &http.Client{Timeout: time.Second * 30}
 
 func main() {
 	configs := createConfigsModelFromEnvs()
