@@ -55,10 +55,10 @@ workflows:
     envs:
     - DEVICE_NUMBER_LIMIT: 2
     steps:
-      - go-list: {}
-      - errcheck: {}
-      - golint: {}
-      - go-test: {}
+    - go-list: {}
+    - errcheck: {}
+    - golint: {}
+    - go-test: {}
     - path::./:
         title: Step Test
         run_if: '{{getenv "STF_HOST_URL" | ne ""}}'
