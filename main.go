@@ -3,6 +3,9 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"github.com/bitrise-io/go-utils/colorstring"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -14,9 +17,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"fmt"
-	"errors"
-	"github.com/bitrise-io/go-utils/colorstring"
 )
 
 type configsModel struct {
@@ -98,14 +98,14 @@ func calculateDeviceCount(configs configsModel, serials []string) int {
 
 func connectDeviceToADB(configs configsModel, serial string) error {
 	if err := addDeviceUnderControl(configs, serial); err != nil {
-		return fmt.Errorf("Could add device under control, error: %s", err)
+		return fmt.Errorf("could not add device under control, error: %s", err)
 	}
 	remoteConnectURL, err := getRemoteConnectURL(configs, serial)
 	if err != nil {
-		return fmt.Errorf("Could not get remote connect URL to device %s, error: %s", serial, err)
+		return fmt.Errorf("could not get remote connect URL to device %s, error: %s", serial, err)
 	}
 	if err := connectToAdb(remoteConnectURL); err != nil {
-		return fmt.Errorf("Could not connect device %s to ADB, error: %s", serial, err)
+		return fmt.Errorf("could not connect device %s to ADB, error: %s", serial, err)
 	}
 	return nil
 }
@@ -194,7 +194,7 @@ func getHomeDir() (string, error) {
 }
 
 func connectToAdb(remoteConnectURL string) error {
-	log.Printf(colorstring.Blue("Connecting ADB to %s"), remoteConnectURL)
+	log.Printf("Connecting ADB to %s", remoteConnectURL)
 	command := exec.Command(getAdbPath(), "connect", remoteConnectURL)
 	output, err := command.CombinedOutput()
 	if err != nil {
