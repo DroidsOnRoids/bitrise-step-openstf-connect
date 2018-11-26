@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/bitrise-io/go-utils/command"
 	"github.com/bitrise-io/go-utils/log"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"os"
-	"os/exec"
 	"os/user"
 	"path/filepath"
 	"strconv"
@@ -171,7 +171,7 @@ func setAdbKeys(configs configsModel, homeDir string) error {
 		return err
 	}
 	if configs.isAnyAdbKeySet() {
-		return exec.Command(getAdbPath(), "kill-server").Run()
+		return command.RunCommand("adb", "kill-server")
 	}
 	return nil
 }
@@ -196,8 +196,7 @@ func getHomeDir() (string, error) {
 
 func connectToAdb(remoteConnectURL string) error {
 	log.Infof("Connecting ADB to %s", remoteConnectURL)
-	command := exec.Command(getAdbPath(), "connect", remoteConnectURL)
-	output, err := command.CombinedOutput()
+	output, err := command.RunCommandAndReturnCombinedStdoutAndStderr("adb", "connect", remoteConnectURL)
 	if err != nil {
 		return err
 	}
@@ -280,14 +279,14 @@ func getSerials(configs configsModel) ([]string, error) {
 		return nil, fmt.Errorf("request failed, status: %s", response.Status)
 	}
 
-	cmd := exec.Command("jq", "-r", ".devices[] | select(.present and .owner == null and ("+configs.deviceFilter+")) | .serial")
-	cmd.Stdin = response.Body
-
 	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err = cmd.Run()
-	if err != nil {
+	cmd := command.New("jq", "-r", ".devices[] | select(.present and .owner == null and ("+configs.deviceFilter+")) | .serial")
+
+	cmd.SetStdin(response.Body)
+	cmd.SetStdout(&stdout)
+	cmd.SetStderr(&stderr)
+
+	if err = cmd.Run(); err != nil {
 		return nil, fmt.Errorf("could not create GET devices list request, error: %s | output: %s", err, stderr.String())
 	}
 
@@ -306,18 +305,10 @@ func shuffleSlice(slice []string) {
 	}
 }
 
-func getAdbPath() string {
-	androidHome := os.Getenv("ANDROID_HOME")
-	if androidHome == "" {
-		return "adb"
-	}
-	return filepath.Join(androidHome, "platform-tools", "adb")
-}
-
 func exportArrayWithEnvman(keyStr string, values []string) error {
 	body, err := json.Marshal(values)
 	if err != nil {
 		return err
 	}
-	return exec.Command("bitrise", "envman", "add", "--key", keyStr, "--value", string(body)).Run()
+	return command.RunCommand("bitrise", "envman", "add", "--key", keyStr, "--value", string(body))
 }
