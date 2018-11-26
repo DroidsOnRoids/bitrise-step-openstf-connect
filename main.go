@@ -5,9 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/bitrise-io/go-utils/colorstring"
+	"github.com/bitrise-io/go-utils/log"
 	"io/ioutil"
-	"log"
 	"math/rand"
 	"net/http"
 	"os"
@@ -49,20 +48,24 @@ func main() {
 	configs := createConfigsModelFromEnvs()
 	configs.dump()
 	if err := configs.validate(); err != nil {
-		logError("Could not validate config, error: %s", err)
+		log.Errorf("Could not validate config, error: %s", err)
+		os.Exit(1)
 	}
 
 	serials, err := getSerials(configs)
 	if err != nil {
-		logError("Could not get device serials, error: %s", err)
+		log.Errorf("Could not get device serials, error: %s", err)
+		os.Exit(2)
 	}
 	homeDir, err := getHomeDir()
 	if err != nil {
-		logError("Could not determine current user home directory, error: %s", err)
+		log.Errorf("Could not determine current user home directory, error: %s", err)
+		os.Exit(3)
 	}
 
 	if err := setAdbKeys(configs, homeDir); err != nil {
-		logError("Could not set ADB keys, error: %s", err)
+		log.Errorf("Could not set ADB keys, error: %s", err)
+		os.Exit(4)
 	}
 
 	deviceCount := calculateDeviceCount(configs, serials)
@@ -71,7 +74,7 @@ func main() {
 	connectedDeviceCount := 0
 	for _, serial := range serials {
 		if err := connectDeviceToADB(configs, serial); err != nil {
-			log.Printf(colorstring.Yellowf("%s", err))
+			log.Warnf("Device %s ignored, error: %s", serial, err)
 		} else {
 			connectedDeviceCount++
 			connectedDeviceSerials = append(connectedDeviceSerials, serial)
@@ -82,10 +85,12 @@ func main() {
 	}
 
 	if err := exportArrayWithEnvman("STF_DEVICE_SERIAL_LIST", connectedDeviceSerials); err != nil {
-		logError("Could export device serials with envman, error: %s", err)
+		log.Errorf("Could export device serials with envman, error: %s", err)
+		os.Exit(5)
 	}
 	if connectedDeviceCount == 0 {
-		logError("No devices can be connected to ADB")
+		log.Errorf("No devices can be connected to ADB")
+		os.Exit(6)
 	}
 }
 
@@ -102,16 +107,12 @@ func connectDeviceToADB(configs configsModel, serial string) error {
 	}
 	remoteConnectURL, err := getRemoteConnectURL(configs, serial)
 	if err != nil {
-		return fmt.Errorf("could not get remote connect URL to device %s, error: %s", serial, err)
+		return fmt.Errorf("could not get remote connect URL, error: %s", err)
 	}
 	if err := connectToAdb(remoteConnectURL); err != nil {
-		return fmt.Errorf("could not connect device %s to ADB, error: %s", serial, err)
+		return fmt.Errorf("could not connect to ADB, error: %s", err)
 	}
 	return nil
-}
-
-func logError(format string, v ...interface{}) {
-	log.Fatalf(colorstring.Red(format), v)
 }
 
 func createConfigsModelFromEnvs() configsModel {
@@ -142,10 +143,10 @@ func parseIntSafely(limit string) int {
 }
 
 func (configs configsModel) dump() {
-	log.Println(colorstring.Blue("Config:"))
-	log.Printf("STF host: %s", configs.stfHostURL)
-	log.Printf("Device filter: %s", configs.deviceFilter)
-	log.Printf("Device number limit: %d", configs.deviceNumberLimit)
+	log.Infof("Config:")
+	log.Infof("STF host: %s", configs.stfHostURL)
+	log.Infof("Device filter: %s", configs.deviceFilter)
+	log.Infof("Device number limit: %d", configs.deviceNumberLimit)
 }
 
 func (configs *configsModel) validate() error {
@@ -194,22 +195,22 @@ func getHomeDir() (string, error) {
 }
 
 func connectToAdb(remoteConnectURL string) error {
-	log.Printf("Connecting ADB to %s", remoteConnectURL)
+	log.Infof("Connecting ADB to %s", remoteConnectURL)
 	command := exec.Command(getAdbPath(), "connect", remoteConnectURL)
 	output, err := command.CombinedOutput()
 	if err != nil {
 		return err
 	}
-	log.Println(string(output))
+	log.Debugf(string(output))
 	return nil
 }
 
 func getRemoteConnectURL(configs configsModel, serial string) (string, error) {
-	req, err := http.NewRequest("POST", configs.stfHostURL + userDevicesEndpoint + "/" + serial + "/remoteConnect", nil)
+	req, err := http.NewRequest("POST", configs.stfHostURL+userDevicesEndpoint+"/"+serial+"/remoteConnect", nil)
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("Authorization", "Bearer " + configs.stfAccessToken)
+	req.Header.Set("Authorization", "Bearer "+configs.stfAccessToken)
 	req.Header.Set("Content-Type", "application/json")
 	response, err := client.Do(req)
 	if err != nil {
@@ -217,7 +218,7 @@ func getRemoteConnectURL(configs configsModel, serial string) (string, error) {
 	}
 	defer func() {
 		if err := response.Body.Close(); err != nil {
-			log.Printf("Failed to close response body, error: %s", err)
+			log.Warnf("Failed to close response body, error: %s", err)
 		}
 	}()
 	bodyBytes, err := ioutil.ReadAll(response.Body)
@@ -238,11 +239,11 @@ func addDeviceUnderControl(configs configsModel, serial string) error {
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequest("POST", configs.stfHostURL + userDevicesEndpoint, bytes.NewBuffer(body))
+	req, err := http.NewRequest("POST", configs.stfHostURL+userDevicesEndpoint, bytes.NewBuffer(body))
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Authorization", "Bearer " + configs.stfAccessToken)
+	req.Header.Set("Authorization", "Bearer "+configs.stfAccessToken)
 	req.Header.Set("Content-Type", "application/json")
 	response, err := client.Do(req)
 	if err != nil {
@@ -258,11 +259,11 @@ func addDeviceUnderControl(configs configsModel, serial string) error {
 }
 
 func getSerials(configs configsModel) ([]string, error) {
-	req, err := http.NewRequest("GET", configs.stfHostURL + devicesEndpoint, nil)
+	req, err := http.NewRequest("GET", configs.stfHostURL+devicesEndpoint, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", "Bearer " + configs.stfAccessToken)
+	req.Header.Set("Authorization", "Bearer "+configs.stfAccessToken)
 
 	response, err := client.Do(req)
 	if err != nil {
@@ -271,7 +272,7 @@ func getSerials(configs configsModel) ([]string, error) {
 
 	defer func() {
 		if err := response.Body.Close(); err != nil {
-			log.Printf("Failed to close response body, error: %s", err)
+			log.Warnf("Failed to close response body, error: %s", err)
 		}
 	}()
 
@@ -279,7 +280,7 @@ func getSerials(configs configsModel) ([]string, error) {
 		return nil, fmt.Errorf("request failed, status: %s", response.Status)
 	}
 
-	cmd := exec.Command("jq", "-r", ".devices[] | select(.present and .owner == null and (" + configs.deviceFilter + ")) | .serial")
+	cmd := exec.Command("jq", "-r", ".devices[] | select(.present and .owner == null and ("+configs.deviceFilter+")) | .serial")
 	cmd.Stdin = response.Body
 
 	var stdout, stderr bytes.Buffer
