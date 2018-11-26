@@ -69,7 +69,7 @@ func main() {
 	}
 
 	deviceCount := calculateDeviceCount(configs, serials)
-	connectedDeviceSerials := []string{}
+	var connectedDeviceSerials []string
 
 	connectedDeviceCount := 0
 	for _, serial := range serials {
