@@ -1,12 +1,12 @@
 package main
 
 import (
-	"testing"
 	"github.com/stretchr/testify/require"
-	"os"
 	"io/ioutil"
-	"path/filepath"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"testing"
 	"time"
 )
 
@@ -22,17 +22,17 @@ func TestParseIntSafely(t *testing.T) {
 }
 
 func TestValidateConfigNoHostUrl(t *testing.T) {
-	configs := configsModel{stfAccessToken:"test"}
+	configs := configsModel{stfAccessToken: "test"}
 	require.Error(t, configs.validate())
 }
 
 func TestValidateConfigNoAccessToken(t *testing.T) {
-	configs := configsModel{stfHostURL:"http://test.test"}
+	configs := configsModel{stfHostURL: "http://test.test"}
 	require.Error(t, configs.validate())
 }
 
 func TestValidateConfigNoErrors(t *testing.T) {
-	configs := configsModel{stfHostURL:"http://test.test", stfAccessToken:"test"}
+	configs := configsModel{stfHostURL: "http://test.test", stfAccessToken: "test"}
 	require.NoError(t, configs.validate())
 }
 
@@ -42,12 +42,12 @@ func TestIsAnyAdbKeySetNoKeys(t *testing.T) {
 }
 
 func TestIsAnyAdbKeySetPrivateOnly(t *testing.T) {
-	configs := configsModel{adbKey:"test"}
+	configs := configsModel{adbKey: "test"}
 	require.True(t, configs.isAnyAdbKeySet())
 }
 
 func TestIsAnyAdbKeySetPublicOnly(t *testing.T) {
-	configs := configsModel{adbKeyPub:"test"}
+	configs := configsModel{adbKeyPub: "test"}
 	require.True(t, configs.isAnyAdbKeySet())
 }
 
@@ -90,7 +90,7 @@ func TestSaveNonEmptyAdbKeyFail(t *testing.T) {
 }
 
 func TestSetAdbKeys(t *testing.T) {
-	configs := configsModel{adbKey:"private", adbKeyPub:"public"}
+	configs := configsModel{adbKey: "private", adbKeyPub: "public"}
 	fakeHomeDir, fakeAndroidUserDir := prepareFakeAndroidHomeDir(t)
 
 	require.NoError(t, exec.Command("adb", "devices").Run())
@@ -105,7 +105,7 @@ func TestSetAdbKeys(t *testing.T) {
 	publicKeyFile := filepath.Join(fakeAndroidUserDir, "adbkey.pub")
 	requireFile(t, publicKeyFile, configs.adbKeyPub, 0644)
 
-	err = retry(5, 50 * time.Millisecond, func() (err error) {
+	err = retry(5, 50*time.Millisecond, func() (err error) {
 		err = exec.Command("adb", "devices").Run()
 		return
 	})
@@ -149,30 +149,17 @@ func prepareFakeAndroidHomeDir(t *testing.T) (string, string) {
 	return fakeHomeDir, fakeAndroidUserDir
 }
 
-func TestGetHomeDir(t *testing.T) {
-	homeDir, err := getHomeDir()
-	require.NoError(t, err)
-	require.Equal(t, os.Getenv("HOME"), homeDir)
-}
-
-func TestGetAdbPath(t *testing.T) {
-	adbPath := getAdbPath()
-	info, err := os.Stat(adbPath)
-	require.NoError(t, err)
-	require.False(t, info.IsDir())
-}
-
 func TestCalculateDeviceCountNoLimit(t *testing.T) {
-	configs := configsModel{deviceNumberLimit:0}
+	configs := configsModel{deviceNumberLimit: 0}
 	require.Equal(t, 2, calculateDeviceCount(configs, []string{"1", "2"}))
 }
 
 func TestCalculateDeviceCountLimitLargerThanNumberOfDevices(t *testing.T) {
-	configs := configsModel{deviceNumberLimit:3}
+	configs := configsModel{deviceNumberLimit: 3}
 	require.Equal(t, 2, calculateDeviceCount(configs, []string{"1", "2"}))
 }
 
 func TestCalculateLimitedDeviceCount(t *testing.T) {
-	configs := configsModel{deviceNumberLimit:1}
+	configs := configsModel{deviceNumberLimit: 1}
 	require.Equal(t, 1, calculateDeviceCount(configs, []string{"1", "2"}))
 }
