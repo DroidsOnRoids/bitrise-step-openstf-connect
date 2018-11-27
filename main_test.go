@@ -83,7 +83,9 @@ func TestSaveNonEmptyAdbKeyFail(t *testing.T) {
 	fakeKey := "key"
 	var mode os.FileMode = 0644
 
-	require.NoError(t, os.Chmod(fakeAndroidUserDir, 000))
+	require.NoError(t, os.RemoveAll(fakeAndroidUserDir))
+	_, err := os.OpenFile(fakeAndroidUserDir, os.O_RDONLY|os.O_CREATE, 0666)
+	require.NoError(t, err)
 	require.Error(t, saveNonEmptyAdbKey(fakeKey, fakeHomeDir, keyFileName, mode))
 
 	require.NoError(t, os.RemoveAll(fakeHomeDir))
