@@ -84,7 +84,7 @@ workflows:
             #!/usr/bin/env bash
             set -e
             [[ $(adb devices | grep device$ -c) -eq "${DEVICE_NUMBER_LIMIT}" ]]
-      - openstf-disconnect:
+    - openstf-disconnect:
         title: Release devices
         run_if: '{{getenv "STF_HOST_URL" | ne ""}}'
         inputs:
