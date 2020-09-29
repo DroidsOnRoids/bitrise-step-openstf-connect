@@ -1,7 +1,6 @@
 # openstf-connect
 
-Bitrise step for [Open STF](https://openstf.io/) devices connection.
-
+Bitrise step for [Device Farmer](https://devicefarmer.github.io/) or [Open STF](https://openstf.io/) devices connection.
 
 ## How to use this Step
 
